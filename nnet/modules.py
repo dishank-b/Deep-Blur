@@ -160,6 +160,29 @@ def batch_normalize(input_layer, dimension, name=None, use_global=False):
 		return output
 
 
+def conv_bn_relu(input_layer, kernel, out_channels, stride=1, name=None, reuse=False, 
+	initializer=tf.contrib.layers.xavier_initializer(), bias_constant=0.01):
+	"""
+	Applies series of operations of `conv`->`batch_norm`->`relu`
+	"""
+	with tf.variable_scope(name+'_block'):
+		conv_ac = conv2d(input_layer, kernel, out_channels, stride, name, reuse)
+		conv_bn = batch_normalize(conv_ac, out_channels)
+		conv_rl = relu(conv_bn)
+		return conv_rl
+
+
+def conv_bn_lrelu(input_layer, kernel, out_channels, stride=1, name=None, reuse=False, 
+	initializer=tf.contrib.layers.xavier_initializer(), bias_constant=0.01):
+	"""
+	Applies series of operations of `conv`->`batch_norm`->`leaky_relu`
+	"""
+	with tf.variable_scope(name+'_block'):
+		conv_ac = conv2d(input_layer, kernel, out_channels, stride, name, reuse)
+		conv_bn = batch_normalize(conv_ac, out_channels)
+		conv_rl = leaky_relu(conv_bn)
+		return conv_rl
+
 
 def residual_block(input_layer, output_channels, stride=1, first_block=False, name=None, reuse=False):
 	"""
@@ -190,3 +213,11 @@ def residual_block(input_layer, output_channels, stride=1, first_block=False, na
 			output = input_layer + conv2
 		return output
 	
+
+def activation_summary(tensor):
+	"""
+	Write the summary of a tensor
+	"""
+	tensor_name = tensor.op.name
+	tf.summary.histogram(tensor_name+'/activation', tensor)
+	tf.summary.scalar(tensor_name+'/sparsity', tf.nn.zero_fraction(tensor))
