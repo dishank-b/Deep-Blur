@@ -1,0 +1,4 @@
+Image-to-Image Translation with Conditional Adversarial Networks
+Unsupervised Image-to-Image Translation Networks
+Generative Adversarial Networks - I. Goodfellow
+						
