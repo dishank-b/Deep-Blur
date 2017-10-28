@@ -1,3 +1,3 @@
-# Background Blur using GANs and VAEs
+# Background Blur using Adversarial Networks
 
 
