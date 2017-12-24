@@ -1,1 +1,2 @@
-"I am going to put the npy file link here after uploading to google drive."
+First try this :- https://drive.google.com/uc?export=download&confirm=Fip3&id=1ivwICqNutiNzni-hMDpHDhQcWjrhdsir
+Otherwise :- https://drive.google.com/file/d/1ivwICqNutiNzni-hMDpHDhQcWjrhdsir/view?usp=sharing
