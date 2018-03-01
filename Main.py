@@ -6,12 +6,16 @@ import glob
 import sys
 import os
 from Models import *
+import yaml
 
 
-images = np.load("./DataSets/cifar_training.npy")
+blur_images = np.load("./Flower_Images.npy")
+blur_images = blur_images[np.random.rand(1,57)*400]
+norm_images = np.load("./Norm_Flower_Images.npy")
 print "Data Loaded"
-images = 1/255.0*images
-images = images.reshape((images.shape[0],3,32,32)).transpose(0,2,3,1)
+
+blur_images = 1/255.0*blur_images
+norm_images = 1/255.0*norm_images
 
 log_dir = "./logs/"
 model_path = log_dir+sys.argv[1]
@@ -22,7 +26,8 @@ if not os.path.exists(model_path):
     os.makedirs(model_path+"/tf_graph")
     os.makedirs(model_path+"/saved_model")
 
+
 cifar_gan = GAN(model_path)
 cifar_gan.Build_Model()
-cifar_gan.Train_Model(inputs = images)
+cifar_gan.Train_Model(inputs = [norm_images, blur_images])
 

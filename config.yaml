@@ -2,9 +2,8 @@ model_params:
   model_name: "UNET"
   mode: "Train"
   code_length: 100
-  input_npy_path: "./Flower_Images.npy"
 
 training_params:
   learning_rate: 1e^-04
-  epochs: 1000
-  batch_size: 64
+  epochs: 100
+  batch_size: 32

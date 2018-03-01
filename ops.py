@@ -83,7 +83,8 @@ def Dense(x, output_dim, use_bn=True, activation=tf.nn.relu, train_phase=True,ad
 			return out
 
 def Bn(x, is_train=True):
-	return tf.contrib.layers.batch_norm(x, is_training=is_train, center= True, scale=True, reuse=False)
+	return tf.contrib.layers.batch_norm(x, updates_collectionss = None,is_training=is_train, 
+			center= True, scale=True, reuse=False)
 
 def L_Relu(x, alpha=0.1):
 	return tf.maximum(x, alpha*x)
