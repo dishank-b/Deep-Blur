@@ -9,7 +9,13 @@ class UNET(object):
 	"""AFGAN Model"""
 	def __init__(self, arg):
 		self.arg = arg
-	
+
+	def set_placeholders(self):
+		"""
+		"""
+		self.images = tf.placeholder(tf.float32, [None, self.arg.h, self.arg.w, 3], name='images')
+		self.is_training = tf.placeholder(dtype=tf.bool, shape=[], name='is_training')
+
 	def encoder(self, img, code_length):
 		with tf.variable_scope("Encoder") as scope:
 			E_conv1 = Conv_2D(img, output_chan=32, use_bn=True,name="E_Conv1")
@@ -120,11 +126,3 @@ class UNET(object):
 				if epoch%5==0:
 					self.saver.save(self.sess, self.save_path+"/chkpnt")
 					print "Checkpoint saved"
-
-
-
-
-
-
-
-
