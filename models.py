@@ -13,13 +13,22 @@ class UNET(object):
 	def encoder(self, img, code_length):
 		with tf.variable_scope("Encoder") as scope:
 			E_conv1 = Conv_2D(img, output_chan=32, use_bn=True,name="E_Conv1")
+			E_conv1 = max_pool(E_conv1)
 			E_conv2 = Conv_2D(E_conv1, output_chan=64, use_bn=True ,name="E_Conv2")
+			E_conv2 = max_pool(E_conv2)
 			E_conv3 = Conv_2D(E_conv2, output_chan=128, use_bn=True ,name="E_Conv3")
-			E_conv4 = Conv_2D(E_conv3, output_chan=512, use_bn=True ,name="E_Conv4")
+			E_conv3 = max_pool(E_conv3)
+			E_conv4 = Conv_2D(E_conv3, output_chan=512, use_bn=True ,name="E_Conv4", use_bn=False)
+			E_conv4 = max_pool(E_conv4)
 			E_conv4_r = tf.reshape(E_conv4, shape=[-1, int(np.prod(E_conv4.get_shape()[1:]))])
 
+			# TODO: assert the shape of sigma and mean
 			E_mean = Dense(E_conv4_r, output_dim=code_length, activation=None,use_bn=False, name="E_mean")
-			E_sigma = Dense(E_conv4_r, output_dim=code_length, activation=None, use_bn=False, name ="E_sigma")
+			# E_sigma = Dense(E_conv4_r, output_dim=1, activation=None, use_bn=False, name ="E_sigma")
+
+			# Get the variance in the log space
+			E_log_var = Dense(E_conv4_r, output_dim=1, activation=None, use_bn=False, name ="E_sigma")
+			E_sigma = tf.exp(0.5 * E_log_var)
 			
 			return E_mean, E_sigma
 
@@ -34,19 +43,25 @@ class UNET(object):
 			G_Dconv6 = Dconv_2D(G_Dconv5, output_chan=32, name="G_hidden6")
 			G_Dconv7 = Dconv_2D(G_Dconv6, output_chan=16, name="G_hidden7")
 			G_Dconv8 = Dconv_2D(G_Dconv7, output_chan=8, name="G_hidden8")
-			G_Dconv9 = Dconv_2D(G_Dconv8, output_chan=3, name="G_output")
-			return tf.nn.sigmoid(G_Dconv9)
+			G_Dconv9 = Dconv_2D(G_Dconv8, output_chan=3, name="G_output", use_bn=False)
+			return tf.nn.tanh(G_Dconv9)
 
 	def discriminator(self, img, reuse=False):
 		with tf.variable_scope("Discriminator", reuse=reuse) as scope:
 			D_conv1  = Conv_2D(img, output_chan=32, use_bn=True, name="D_conv1")
+			D_conv1 = max_pool(D_conv1)
 			D_conv2  = Conv_2D(D_conv1, output_chan=64, use_bn=True, name="D_conv2")
+			D_conv2 = max_pool(D_conv2)
 			D_conv3  = Conv_2D(D_conv2, output_chan=128, use_bn=True, name="D_conv3")
-			D_conv4  = Conv_2D(D_conv3, output_chan=512, use_bn=True, name="D_conv4")
+			D_conv3 = max_pool(D_conv3)
+			D_conv4  = Conv_2D(D_conv3, output_chan=512, use_bn=True, name="D_conv4", use_bn=False)
+			D_conv4 = max_pool(D_conv4)
+			# D_conv4_r = tf.reshape(D_conv2, shape=[-1, int(np.prod(D_conv2.get_shape().as_list()[1:]))])
 			D_conv4_r = tf.reshape(D_conv4, shape=[-1, int(np.prod(D_conv4.get_shape()[1:]))])
 			D_linear5 = Dense(D_conv4_r,output_dim=1028, name="D_dense5")
+			D_linear6 = Dense(D_linear5,output_dim=1, name="D_dense6")
 
-			return tf.nn.sigmoid(D_linear5)
+			return tf.nn.sigmoid(D_linear6)
 
 	def build_model(self):
 		with tf.name_scope("Inputs") as scope:
@@ -72,10 +87,13 @@ class UNET(object):
 			self.marg_likeli = tf.reduce_mean(self.marg_likeli)
 			self.KL_diver = tf.reduce_mean(self.KL_diver)
 			self.encod_loss = self.KL_diver - self.marg_likeli
+
 			self.dis_real_loss = tf.reduce_mean(-tf.log(self.dis_real))
 			self.dis_fake_loss = tf.reduce_mean(-tf.log(1-self.dis_fake))
+
 			self.dis_loss = self.dis_real_loss + self.dis_fake_loss
 			self.gen_loss = tf.reduce_mean(-tf.log(self.dis_fake))
+
 			self.dis_loss_summ = tf.summary.scalar("Discriminator Loss", self.dis_loss)
 			self.gen_loss_summ = tf.summary.scalar("Generator Loss", self.gen_loss)
 
@@ -83,17 +101,17 @@ class UNET(object):
 			self.d_vars = [var for var in train_vars if "D_" in var.name]
 			self.g_vars = [var for var in train_vars if "G_" in var.name]
 			self.enc_vars = [var for var in train_vars if "E_" in var.name]
-		
+
 		with tf.name_scope("Optimizers") as scope:
 			D_solver = tf.train.AdamOptimizer(learning_rate=1e-5, beta1=0.1).minimize(self.dis_loss, var_list=self.d_vars)
 			G_solver = tf.train.AdamOptimizer(learning_rate=1e-5, beta1=0.3).minimize(self.gen_loss, var_list=self.g_vars)
 			E_solver = tf.train.AdamOptimizer(learning_rate=1e-5, beta1=0.1).minimize(self.encod_loss, var_list=self.enc_vars)
-		
+
 		self.sess = tf.Session()
-		self.saver = tf.train.Saver()
-		self.sess.run(tf.global_variables_initializer())
 		self.writer = tf.summary.FileWriter(self.graph_path)
 		self.writer.add_graph(self.sess.graph)
+		self.saver = tf.train.Saver()
+		self.sess.run(tf.global_variables_initializer())
 
 	def train_model(self,inputs,learning_rate=1e-5, batch_size=64, epoch_size=300):
 
