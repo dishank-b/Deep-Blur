@@ -8,8 +8,8 @@ def Conv_2D(x, output_chan, kernel=[5,5], stride=[2,2],padding="SAME" ,activatio
 	kern = [kernel[0], kernel[1], input_shape[-1], output_chan]
 	strd = [1, stride[0], stride[1], 1]
 	with tf.variable_scope(name) as scope:
-		W = tf.get_variable(name="W", shape=kern, initializer=tf.truncated_normal_initializer(stddev=0.2))
-		b = tf.get_variable(name="b", shape=[output_chan], initializer=tf.zeros_initializer())
+		W = tf.get_variable(name="W", shape=kern, initializer=tf.truncated_normal_initializer(stddev=0.01))
+		b = tf.get_variable(name="b", shape=[output_chan], initializer=tf.constant_initializer(0.1))
 
 		Conv2D = tf.nn.bias_add(tf.nn.conv2d(input=x, filter=W, strides=strd, padding=padding), b)
 		
@@ -30,14 +30,14 @@ def Conv_2D(x, output_chan, kernel=[5,5], stride=[2,2],padding="SAME" ,activatio
 		else:
 			return out
 
-def Dconv_2D(x, output_chan, kernel=[5,5], stride=[2,2], padding="SAME",activation=tf.nn.relu, use_bn=True, train_phase=True,add_summary=False, name="D_conv2D"):
+def Dconv_2D(x, output_chan,batch_size ,kernel=[5,5], stride=[2,2], padding="SAME",activation=tf.nn.relu, use_bn=True, train_phase=True,add_summary=False, name="D_conv2D"):
 	input_shape = x.get_shape().as_list()
 	kern = [kernel[0], kernel[1], output_chan, input_shape[-1]]
 	strd = [1, stride[0], stride[1], 1]
-	output_shape = [64,input_shape[1]*strd[1],input_shape[2]*strd[2],output_chan]
+	output_shape = [batch_size,input_shape[1]*strd[1],input_shape[2]*strd[2],output_chan]
 	with tf.variable_scope(name) as scope:
-		W = tf.get_variable(name="W", shape=kern, initializer=tf.truncated_normal_initializer(stddev=0.2))
-		b = tf.get_variable(name="b", shape=[output_chan], initializer=tf.zeros_initializer())
+		W = tf.get_variable(name="W", shape=kern, initializer=tf.truncated_normal_initializer(stddev=0.01))
+		b = tf.get_variable(name="b", shape=[output_chan], initializer=tf.constant_initializer(0.1))
 
 		D_Conv2D = tf.nn.bias_add(tf.nn.conv2d_transpose(x, filter=W, output_shape=output_shape,strides=strd, padding=padding), b)
 		
@@ -62,8 +62,8 @@ def Dconv_2D(x, output_chan, kernel=[5,5], stride=[2,2], padding="SAME",activati
 def Dense(x, output_dim, use_bn=True, activation=tf.nn.relu, train_phase=True,add_summary=False, name="Dense"):
 	input_dim = x.get_shape()[-1]
 	with tf.variable_scope(name) as scope:
-		W = tf.get_variable('W', shape=[input_dim, output_dim], initializer=tf.truncated_normal_initializer(stddev=0.2))
-		b = tf.get_variable('b', shape=[output_dim], initializer=tf.zeros_initializer())
+		W = tf.get_variable('W', shape=[input_dim, output_dim], initializer=tf.truncated_normal_initializer(stddev=0.01))
+		b = tf.get_variable('b', shape=[output_dim], initializer=tf.constant_initializer(0.1))
 
 		dense = tf.nn.bias_add(tf.matmul(x, W), b)
 
