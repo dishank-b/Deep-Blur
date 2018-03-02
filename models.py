@@ -2,19 +2,13 @@
 from __future__ import unicode_literals
 import tensorflow as tf
 import numpy as np
-import cv2
-from Ops import *
+# import cv2
+from ops import *
 
 class UNET(object):
 	"""AFGAN Model"""
-	def __init__(self, arg):
-		self.arg = arg
-
-	def set_placeholders(self):
-		"""
-		"""
-		self.images = tf.placeholder(tf.float32, [None, self.arg.h, self.arg.w, 3], name='images')
-		self.is_training = tf.placeholder(dtype=tf.bool, shape=[], name='is_training')
+	def __init__(self, model_path):
+		self.graph_path = model_path+"/tf_graph/"
 
 	def encoder(self, img, code_length):
 		with tf.variable_scope("Encoder") as scope:
@@ -25,32 +19,32 @@ class UNET(object):
 			E_conv4_r = tf.reshape(E_conv4, shape=[-1, int(np.prod(E_conv4.get_shape()[1:]))])
 
 			E_mean = Dense(E_conv4_r, output_dim=code_length, activation=None,use_bn=False, name="E_mean")
-			E_signma = Dense(E_conv4_r, output_dim=code_length, activation=None, use_bn=False, name ="E_sigma")
+			E_sigma = Dense(E_conv4_r, output_dim=code_length, activation=None, use_bn=False, name ="E_sigma")
 			
 			return E_mean, E_sigma
 
 	def generator(self,z):
 		with tf.variable_scope("Generator") as scope:
-			G_linear1 = Dense(x, output_dim=1024, name="G_hidden1")
+			G_linear1 = Dense(z, output_dim=1024, name="G_hidden1")
 			G_linear2 = Dense(G_linear1, output_dim=4*4*512, name="G_hidden2")
 			G_linear2_r = tf.reshape(G_linear2, shape=[-1,4, 4, 256])
 			G_Dconv3 = Dconv_2D(G_linear2_r, output_chan=128, name="G_hidden3")
 			G_Dconv4 = Dconv_2D(G_Dconv3, output_chan=128, name="G_hidden4")
-			G_Dconv5 = Dconv_2D(G_Dconv4, output_chan=64, name="G_hidden4")
-			G_Dconv6 = Dconv_2D(G_Dconv5, output_chan=32, name="G_hidden4")
-			G_Dconv7 = Dconv_2D(G_Dconv6, output_chan=16, name="G_hidden4")
-			G_Dconv8 = Dconv_2D(G_Dconv7, output_chan=8, name="G_hidden4")
+			G_Dconv5 = Dconv_2D(G_Dconv4, output_chan=64, name="G_hidden5")
+			G_Dconv6 = Dconv_2D(G_Dconv5, output_chan=32, name="G_hidden6")
+			G_Dconv7 = Dconv_2D(G_Dconv6, output_chan=16, name="G_hidden7")
+			G_Dconv8 = Dconv_2D(G_Dconv7, output_chan=8, name="G_hidden8")
 			G_Dconv9 = Dconv_2D(G_Dconv8, output_chan=3, name="G_output")
 			return tf.nn.sigmoid(G_Dconv9)
 
-	def discriminator(self, img):
-		with tf.variable_scope("Discriminator") as scope:
+	def discriminator(self, img, reuse=False):
+		with tf.variable_scope("Discriminator", reuse=reuse) as scope:
 			D_conv1  = Conv_2D(img, output_chan=32, use_bn=True, name="D_conv1")
-			D_conv2  = Conv_2D(D_conv1, output_chan=64, use_bn=True, name="D_conv1")
-			D_conv3  = Conv_2D(D_conv2, output_chan=128, use_bn=True, name="D_conv1")
-			D_conv4  = Conv_2D(D_conv3, output_chan=512, use_bn=True, name="D_conv1")
+			D_conv2  = Conv_2D(D_conv1, output_chan=64, use_bn=True, name="D_conv2")
+			D_conv3  = Conv_2D(D_conv2, output_chan=128, use_bn=True, name="D_conv3")
+			D_conv4  = Conv_2D(D_conv3, output_chan=512, use_bn=True, name="D_conv4")
 			D_conv4_r = tf.reshape(D_conv4, shape=[-1, int(np.prod(D_conv4.get_shape()[1:]))])
-			D_linear5 = Dense(D_conv4_r,output_dim=1028)
+			D_linear5 = Dense(D_conv4_r,output_dim=1028, name="D_dense5")
 
 			return tf.nn.sigmoid(D_linear5)
 
@@ -60,12 +54,13 @@ class UNET(object):
 			self.x_blur = tf.placeholder(tf.float32, shape=[None,512,512,3], name="Input_Blurred")
 			self.z = tf.placeholder(tf.float32, shape=[None, 100], name="Noise")
 			self.train_phase = tf.placeholder(tf.bool, name="is_train")
-			self.x_summ = tf.summary.image("Input Images", self.x)
+			self.x_norm_summ = tf.summary.image("Input Images", self.x_norm)
+			self.x_blur_summ = tf.summary.image("Input Images", self.x_blur)
 			self.z_summ = tf.summary.histogram("Input Noise", self.z)
 
 		with tf.name_scope("Model") as scope:
 			self.encod_mean, self.encod_sigma = self.encoder(self.x_norm, 100)
-			self.gen_in = self.encod_mean + self.encod_sigma*self.z, 0, 1, dtype=tf.float32)
+			self.gen_in = self.encod_mean + self.encod_sigma*self.z
 			self.gen_out = self.generator(self.gen_in)
 			self.dis_real = self.discriminator(self.x_blur, reuse=False)
 			self.dis_fake = self.discriminator(self.gen_out, reuse=True)
@@ -88,19 +83,19 @@ class UNET(object):
 			self.d_vars = [var for var in train_vars if "D_" in var.name]
 			self.g_vars = [var for var in train_vars if "G_" in var.name]
 			self.enc_vars = [var for var in train_vars if "E_" in var.name]
-
-	def train_model(self,inputs,learning_rate=1e-5, batch_size=64, epoch_size=300):
-
+		
 		with tf.name_scope("Optimizers") as scope:
-			D_solver = tf.train.AdamOptimizer(learning_rate, beta1=0.1).minimize(self.dis_loss, var_list=self.d_vars)
-			G_solver = tf.train.AdamOptimizer(learning_rate, beta1=0.3).minimize(self.gen_loss, var_list=self.g_vars)
-			E_solver = tf.train.AdamOptimizer(learning_rate, beta1=0.1).minimize(self.encod_loss, var_list=self.enc_vars)
+			D_solver = tf.train.AdamOptimizer(learning_rate=1e-5, beta1=0.1).minimize(self.dis_loss, var_list=self.d_vars)
+			G_solver = tf.train.AdamOptimizer(learning_rate=1e-5, beta1=0.3).minimize(self.gen_loss, var_list=self.g_vars)
+			E_solver = tf.train.AdamOptimizer(learning_rate=1e-5, beta1=0.1).minimize(self.encod_loss, var_list=self.enc_vars)
 		
 		self.sess = tf.Session()
 		self.saver = tf.train.Saver()
 		self.sess.run(tf.global_variables_initializer())
 		self.writer = tf.summary.FileWriter(self.graph_path)
 		self.writer.add_graph(self.sess.graph)
+
+	def train_model(self,inputs,learning_rate=1e-5, batch_size=64, epoch_size=300):
 
 		with tf.name_scope("Training") as scope:
 
