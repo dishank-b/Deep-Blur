@@ -1,3 +1,5 @@
+*npy
+logs/**
 data/**
 ckpt/**
 imgs/**

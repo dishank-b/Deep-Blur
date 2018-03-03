@@ -41,5 +41,5 @@ os.system('cp config.yaml '+model_path+'/config.yaml')
 
 Unet = UNET(model_path)
 Unet.build_model()
-Unet.train_model(inputs = [norm_images, blur_images],learning_rate, batch_size, epoch_size)
+Unet.train_model(learning_rate, batch_size, epoch_size,inputs = [norm_images, blur_images])
 
