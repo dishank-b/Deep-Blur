@@ -9,6 +9,8 @@ class UNET(object):
 	"""AFGAN Model"""
 	def __init__(self, model_path):
 		self.graph_path = model_path+"/tf_graph/"
+		self.save_path = model_path + "/saved_model/"
+		self.output_path = model_path + "/results/"
 
 	def encoder(self, img, code_length):
 		with tf.variable_scope("Encoder") as scope:
@@ -113,12 +115,12 @@ class UNET(object):
 		self.saver = tf.train.Saver()
 		self.sess.run(tf.global_variables_initializer())
 
-	def train_model(self,inputs,learning_rate=1e-5, batch_size=64, epoch_size=300):
+	def train_model(self,inputs,learning_rate=1e-5, batch_size=4, epoch_size=100):
 
 		with tf.name_scope("Training") as scope:
 
 			for epoch in range(epoch_size):
-				for itr in xrange(0, len(inputs)-batch_size, batch_size):
+				for itr in xrange(0, len(inputs[0])-batch_size, batch_size):
 					norm_images = inputs[0][itr:itr+batch_size]
 					blur_images = inputs[1][itr:itr+batch_size]
 					batch_z = np.random_normal(shape=[batch_size,code_length])
@@ -135,7 +137,26 @@ class UNET(object):
 						print "Epoch: ", epoch, "Iteration: ", itr
 						print "Dis Fake Loss: ", D_outputs[3], "Dis Real Loss: ", D_outputs[2], "Dis Total Loss", D_outputs[4]
 						print "Generator Loss: ", G_outputs[2]
+						print "Encoder Loss: ", G_outputs[3]
 
-				if epoch%5==0:
-					self.saver.save(self.sess, self.save_path+"/chkpnt")
+				if epoch%10==0:
+					self.saver.save(self.sess, self.save_path)
 					print "Checkpoint saved"
+
+					input_img = inputs[0][5:13]
+					sample_z = np.random_normal(shape=[8,code_length])
+
+					generated_images = self.sess.run([self.gen_out], {self.x_norm: input_img, self.z : sample_z, self.train_phase:False})
+					all_images = np.array(generated_images[0])
+					
+					for i in range(4):
+						image_grid_horizontal = 255.0*all_images[i*4]
+						for j in range(3):
+							image = 255.0*all_images[i*4+j+1]
+							image_grid_horizontal = np.hstack((image_grid_horizontal, image))
+						if i==0:
+							image_grid_vertical = image_grid_horizontal
+						else:
+							image_grid_vertical = np.vstack((image_grid_vertical, image_grid_horizontal))
+
+					cv2.imwrite(self.output_path +"/img_"+str(epoch)+".jpg", image_grid_vertical)
