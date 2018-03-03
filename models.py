@@ -167,8 +167,20 @@ class UNET(object):
 			self.encod_mean, self.encod_sigma = self.encoder(self.x_blur, self.code_length)
 			self.gen_in = self.encod_mean + self.encod_sigma*self.z
 			# self.gen_out = self.generator(self.gen_in, batch_size)
+
+			def train_mode():
+				return self.gen_in
+
+			def test_mode():
+				return self.z
+
+			self.gen_input_noise = tf.cond(tf.equal(self.train_phase, tf.constant(True)),
+													 true_fn=train_mode,
+													 false_fn=test_mode,
+													 name='Noise'
+													 )
 			with tf.variable_scope("Generator") as scope:
-				self.gen_out = self.unet_gen(self.gen_in, self.x_norm, batch_size)
+				self.gen_out = self.unet_gen(self.gen_input_noise, self.x_norm, batch_size)
 			self.dis_real = self.discriminator(self.x_blur, reuse=False)
 			self.dis_fake = self.discriminator(self.gen_out, reuse=True)
 			self.gen_summ = tf.summary.image("Generator images", self.gen_out)
@@ -223,11 +235,9 @@ class UNET(object):
 					G_outputs = self.sess.run(G_inputs, {self.x_norm:norm_images,self.x_blur:blur_images,
 						self.z:batch_z, self.train_phase:True})
 
-					if itr%5==0:
-						print "Epoch: ", epoch, "Iteration: ", itr
-						print "Dis Fake Loss: ", D_outputs[2], "Dis Real Loss: ", D_outputs[1], "Dis Total Loss", D_outputs[3]
-						print "Generator Loss: ", G_outputs[2]
-						print "Encoder Loss: ", G_outputs[3]
+					if itr%2==0:
+						print "Epoch: {:4d} Iteration: {:3d} D_fake_loss: {:.5f} D_real_loss: {:.5f} D_loss: {:.5f} G_loss: {:.5f} E_loss: {:.5f}".format(
+							epoch, itr, D_outputs[2], D_outputs[1], D_outputs[3], G_outputs[2], G_outputs[3])
 						# print "Enc conv1: ", G_outputs[-2]
 						# print "Enc conv4: ", G_outputs[-1]
 						# print 'Mean: {}\tSigma:{}'.format(G_outputs[-4], G_outputs[-3])
@@ -238,7 +248,7 @@ class UNET(object):
 
 					input_img = inputs[0][5:9]
 
-					generated_images = self.sess.run([self.gen_out], {self.x_norm: input_img, self.z : sample_z, self.train_phase:False})
+					generated_images = self.sess.run([self.gen_out], {self.train_phase:False, self.x_norm: input_img, self.z : sample_z, self.x_blur:blur_images})
 					all_images = np.array(generated_images[0])
 					
 					for i in range(2):
